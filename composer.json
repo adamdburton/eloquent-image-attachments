@@ -1,6 +1,6 @@
 {
     "name": "adamdburton/eloquent-image-attachments",
-    "description": "Adds image attachment fields to eloquent models through a trait.",
+    "description": "Simple image attachments for Eloquent models.",
     "autoload": {
         "psr-4": {
             "AdamDBurton\\EloquentImageAttachments\\": "src/"
