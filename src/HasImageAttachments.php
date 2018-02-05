@@ -2,6 +2,7 @@
 
 namespace AdamDBurton\EloquentImageAttachments;
 
+use Exception;
 use Illuminate\Database\Eloquent\Model;
 
 trait HasImageAttachments
@@ -13,6 +14,11 @@ trait HasImageAttachments
 
 	public static function bootHasImageAttachments()
 	{
+		if(!method_exists(get_called_class(), 'bootHasCustomCasts'))
+		{
+			throw new Exception('AdamDBurton\EloquentImageAttachments\HasImageAttachments trait requires AdamDBurton\EloquentCustomCasts\HasCustomCasts trait too. Please import it in your class.');
+		}
+
 		static::retrieved(function(Model $model)
 		{
 			foreach($model->getImageAttachments() as $field)
@@ -21,7 +27,7 @@ trait HasImageAttachments
 			}
 		});
 
-		static::updating(function(Model $model)
+		static::saving(function(Model $model)
 		{
 			// Save/remove attachments
 

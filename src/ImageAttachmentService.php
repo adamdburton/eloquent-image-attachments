@@ -15,6 +15,11 @@ class ImageAttachmentService
 		return Config::get('image-attachments' . ($path ? '.' . $path : ''));
 	}
 
+	public static function getDriver()
+	{
+		return self::getConfig('storage_driver');
+	}
+
 	private static function getExtension(Image $image)
 	{
 		$mime = $image->mime();
@@ -40,8 +45,13 @@ class ImageAttachmentService
 		return trim(self::getConfig('base_path'), '/') . '/' . Carbon::now()->format('Y/m/d') . '/' . md5($image->filename . time()) . '_' . $transformName . self::getExtension($image);
 	}
 
-	private static function storeImage(Image $image, $transformName, $quality)
+	public static function storeImage(Image $image, $transformName, $quality = null)
 	{
+		if($quality === null)
+		{
+			$quality = self::getConfig('default_quality');
+		}
+
 		$path = self::generatePath($image, $transformName);
 
 		$disk = Storage::disk(self::getConfig('storage_driver'));
@@ -59,7 +69,7 @@ class ImageAttachmentService
 		}
 	}
 
-	private static function transformImage(Image $image, $width, $height, $crop, $scaleUp)
+	public static function transformImage(Image $image, $width = null, $height = null, $crop = true, $scaleUp = false)
 	{
 		return $image->fit($width, $crop ? null : $height, function($constraint) use ($crop, $scaleUp)
 		{
@@ -75,42 +85,57 @@ class ImageAttachmentService
 		});
 	}
 
+	public static function makeImage($image)
+	{
+		$manager = new ImageManager;
+
+		return $manager->make($image);
+	}
+
 	public static function saveImage($originalImage)
 	{
 		$driver = self::getConfig('storage_driver');
 
 		$data = [
-			'driver' => $driver
+			'driver' => $driver,
+			'transforms' => []
 		];
 
-		$manager = new ImageManager;
+		$image = self::makeImage($originalImage);
+
+		$data['original'] = self::storeImage($image, 'original', 100);
 
 		foreach(self::getConfig('transforms') as $transformName => $transformSettings)
 		{
-			$image = $manager->make($originalImage);
+			$image = self::makeImage($originalImage);
 
 			$width = (int) isset($transformSettings['width']) ? $transformSettings['width'] : null;
 			$height = (int) isset($transformSettings['height']) ? $transformSettings['height'] : null;
-			$crop = (bool) isset($transformSettings['crop']) ? $transformSettings['crop'] : true;
-			$scaleUp = (bool) isset($transformSettings['scaleUp']) ? $transformSettings['scaleUp'] : false;
-			$quality = (int) isset($transformSettings['quality']) ? $transformSettings['quality'] : 85;
+			$crop = (bool) isset($transformSettings['crop']) ? $transformSettings['crop'] : null;
+			$scaleUp = (bool) isset($transformSettings['scaleUp']) ? $transformSettings['scaleUp'] : null;
+			$quality = (int) isset($transformSettings['quality']) ? $transformSettings['quality'] : null;
 			$callback = isset($transformSettings['callback']) && is_callable($transformSettings['callback']) ? $transformSettings['callback'] : function(Image $image) {};
 
 			$image = self::transformImage($image, $width, $height, $crop, $scaleUp);
 
 			$callback($image);
 
-			$data[$transformName] = self::storeImage($image, $transformName, $quality);
+			$data['transforms'][$transformName] = self::storeImage($image, $transformName, $quality);
 		}
 
 		return array_filter($data);
+	}
+
+	public static function getImageFromStorage($driver, $path)
+	{
+		return Storage::disk($driver)->path($path);
 	}
 
 	public static function deleteImage($value)
 	{dd($value);
 		if(is_object($value) && $value->driver)
 		{
-			foreach($value as $transformName => $data)
+			foreach($value->transforms as $transformName => $data)
 			{
 				if(is_object($data))
 				{

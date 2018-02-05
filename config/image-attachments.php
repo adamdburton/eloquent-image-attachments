@@ -17,8 +17,9 @@ return [
 	'image_driver' => 'gd', // gd or imagick
 	'storage_driver' => 'public', // From filesystem.php
 	'base_path' => 'images', // Leave blank for filesystem root
+	'default_quality' => 90, // The default quality for saving/outputting jpg files
 	'transforms' => [
-		'original' => [ 'width' => 2000, 'crop' => false, 'quality' => 85 ],
+		'large' => [ 'width' => 2000, 'crop' => false, 'quality' => 85 ],
 		'thumbnail' => [ 'width' => 150, 'height' => 150, 'crop' => true, 'quality' => 85 ]
 	]
 ];
