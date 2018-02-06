@@ -15,7 +15,7 @@ class ImageAttachmentService
 		return Config::get('image-attachments' . ($path ? '.' . $path : ''));
 	}
 
-	public static function getDriver()
+	private static function getDriver()
 	{
 		return self::getConfig('storage_driver');
 	}
@@ -92,6 +92,22 @@ class ImageAttachmentService
 		return $manager->make($image);
 	}
 
+	public static function performTransform(Image $image, $transformName, $transformSettings)
+	{
+		$width = (int) isset($transformSettings['width']) ? $transformSettings['width'] : null;
+		$height = (int) isset($transformSettings['height']) ? $transformSettings['height'] : null;
+		$crop = (bool) isset($transformSettings['crop']) ? $transformSettings['crop'] : null;
+		$scaleUp = (bool) isset($transformSettings['scaleUp']) ? $transformSettings['scaleUp'] : null;
+		$quality = (int) isset($transformSettings['quality']) ? $transformSettings['quality'] : null;
+		$callback = isset($transformSettings['callback']) && is_callable($transformSettings['callback']) ? $transformSettings['callback'] : function(Image $image) {};
+
+		$image = self::transformImage($image, $width, $height, $crop, $scaleUp);
+
+		$callback($image);
+
+		return self::storeImage($image, $transformName, $quality);
+	}
+
 	public static function saveImage($originalImage)
 	{
 		$driver = self::getConfig('storage_driver');
@@ -108,19 +124,9 @@ class ImageAttachmentService
 		foreach(self::getConfig('transforms') as $transformName => $transformSettings)
 		{
 			$image = self::makeImage($originalImage);
+			$image = self::performTransform($image, $transformName, $transformSettings);
 
-			$width = (int) isset($transformSettings['width']) ? $transformSettings['width'] : null;
-			$height = (int) isset($transformSettings['height']) ? $transformSettings['height'] : null;
-			$crop = (bool) isset($transformSettings['crop']) ? $transformSettings['crop'] : null;
-			$scaleUp = (bool) isset($transformSettings['scaleUp']) ? $transformSettings['scaleUp'] : null;
-			$quality = (int) isset($transformSettings['quality']) ? $transformSettings['quality'] : null;
-			$callback = isset($transformSettings['callback']) && is_callable($transformSettings['callback']) ? $transformSettings['callback'] : function(Image $image) {};
-
-			$image = self::transformImage($image, $width, $height, $crop, $scaleUp);
-
-			$callback($image);
-
-			$data['transforms'][$transformName] = self::storeImage($image, $transformName, $quality);
+			$data['transforms'][$transformName] = $image;
 		}
 
 		return array_filter($data);

@@ -2,7 +2,9 @@
 
 namespace AdamDBurton\EloquentImageAttachments;
 
-class Image extends AttributeCast
+use AdamDBurton\EloquentCustomCasts\CustomCast;
+
+class Image extends CustomCast
 {
 	private $image;
 
@@ -29,7 +31,7 @@ class Image extends AttributeCast
 
 			$data = ImageAttachmentService::storeImage($transformedImage, $transformName, $quality);
 
-			 $this->data->transforms->$transformName = $data;
+			$this->additionalTransforms[$transformName] = $data;
 		}
 
 		return $transformedImage->response(null, $quality);
@@ -50,7 +52,10 @@ class Image extends AttributeCast
 
 	public function saving()
 	{
-		return ImageAttachmentService::saveImage($this->image);
+		$data = ImageAttachmentService::saveImage($this->image);
+		$data['transforms'] = array_merge($data['transforms'], $this->additionalTransforms); // Merge in any manually created transforms
+
+		return $data;
 	}
 
 	public function delete()
